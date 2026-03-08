@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>接金币小游戏</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+        }
+        #startScreen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #ffd700;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+        }
+        #startScreen button {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(255,107,107,0.4);
+            transition: transform 0.2s;
+        }
+        #startScreen button:hover {
+            transform: scale(1.1);
+        }
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+        }
+        #gameOver h2 {
+            font-size: 42px;
+            color: #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">分数: <span id="score">0</span></div>
+    <div id="startScreen">
+        <h1>🪙 接金币</h1>
+        <p>移动鼠标/触摸来控制碗左右移动</p>
+        <p>接到金币得分，漏掉扣命！</p>
+        <button onclick="startGame()">开始游戏</button>
+    </div>
+    <div id="gameOver">
+        <h2>游戏结束!</h2>
+        <p>最终得分: <span id="finalScore">0</span></p>
+        <button onclick="startGame()" style="padding: 15px 40px; font-size: 24px; background: linear-gradient(135deg, #4ecdc4, #44a08d); color: white; border: none; border-radius: 50px; cursor: pointer;">再来一次</button>
+    </div>
+    <canvas id="game"></canvas>
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        let score = 0;
+        let lives = 3;
+        let gameRunning = false;
+        let bucket = { x: canvas.width / 2, y: canvas.height - 80, width: 100, height: 50 };
+        let coins = [];
+        let particles = [];
+        
+        function startGame() {
+            score = 0;
+            lives = 3;
+            coins = [];
+            particles = [];
+            gameRunning = true;
+            document.getElementById('score').textContent = score;
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOver').style.display = 'none';
+            gameLoop();
+        }
+        
+        function spawnCoin() {
+            coins.push({
+                x: Math.random() * (canvas.width - 40) + 20,
+                y: -30,
+                size: 25 + Math.random() * 15,
+                speed: 3 + Math.random() * 3,
+                value: Math.random() > 0.8 ? 10 : 1,
+                color: Math.random() > 0.8 ? '#ffd700' : '#ff6b6b'
+            });
+        }
+        
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1,
+                    color: color
+                });
+            }
+        }
+        
+        function drawBucket() {
+            ctx.fillStyle = '#8b4513';
+            ctx.beginPath();
+            ctx.moveTo(bucket.x - bucket.width/2, bucket.y);
+            ctx.lineTo(bucket.x + bucket.width/2, bucket.y);
+            ctx.lineTo(bucket.x + bucket.width/2 - 10, bucket.y + bucket.height);
+            ctx.lineTo(bucket.x - bucket.width/2 + 10, bucket.y + bucket.height);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.fillStyle = '#a0522d';
+            ctx.fillRect(bucket.x - bucket.width/2 - 5, bucket.y - 10, bucket.width + 10, 15);
+        }
+        
+        function drawCoins() {
+            coins.forEach(coin => {
+                ctx.fillStyle = coin.color;
+                ctx.beginPath();
+                ctx.arc(coin.x, coin.y, coin.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = `${coin.size}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(coin.value > 1 ? '$' : '$', coin.x, coin.y);
+            });
+        }
+        
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+        
+        function drawLives() {
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = '30px Arial';
+            for (let i = 0; i < lives; i++) {
+                ctx.fillText('❤️', 30 + i * 40, 70);
+            }
+        }
+        
+        function update() {
+            if (!gameRunning) return;
+            
+            if (Math.random() < 0.03) spawnCoin();
+            
+            coins.forEach((coin, index) => {
+                coin.y += coin.speed;
+                
+                if (coin.y + coin.size > bucket.y && 
+                    coin.y - coin.size < bucket.y + bucket.height &&
+                    coin.x > bucket.x - bucket.width/2 &&
+                    coin.x < bucket.x + bucket.width/2) {
+                    score += coin.value;
+                    document.getElementById('score').textContent = score;
+                    createParticles(coin.x, coin.y, coin.color);
+                    coins.splice(index, 1);
+                } else if (coin.y > canvas.height) {
+                    lives--;
+                    coins.splice(index, 1);
+                    if (lives <= 0) {
+                        gameRunning = false;
+                        document.getElementById('finalScore').textContent = score;
+                        document.getElementById('gameOver').style.display = 'block';
+                    }
+                }
+            });
+            
+            particles.forEach((p, index) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.03;
+                if (p.life <= 0) particles.splice(index, 1);
+            });
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBucket();
+            drawCoins();
+            drawParticles();
+            drawLives();
+        }
+        
+        function gameLoop() {
+            if (gameRunning) {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        canvas.addEventListener('mousemove', (e) => {
+            bucket.x = e.clientX;
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            bucket.x = e.touches[0].clientX;
+        });
+        
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            bucket.y = canvas.height - 80;
+        });
+    </script>
+</body>
+</html>
